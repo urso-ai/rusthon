@@ -12,6 +12,7 @@ Currently, Rusthon supports the transpilation of the following constructs:
 - Variable assignments.
 - The conditional declaration if __name__ == "__main__":.
 - The print() function.
+- For loop and range()
 
 ## How to Use
 1. Clone the repository:
