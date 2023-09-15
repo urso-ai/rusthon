@@ -39,6 +39,9 @@ def translate_node(node):
     elif isinstance(node, ast.Expr):
         return translate_node(node.value) + ";"
 
+    elif isinstance(node, ast.For):
+        return translate_for(node)
+
     return f"/* Rusthon: unable to translate the segment. ({type(node).__name__}) */"
 
 
@@ -66,6 +69,17 @@ def translate_type(node):
 
 
 def translate_call(node):
+    if isinstance(node.func, ast.Name) and node.func.id == "range":
+        if len(node.args) == 1:
+            stop_value = translate_node(node.args[0])
+            return f"0..{stop_value}"
+        elif len(node.args) == 2:
+            start_value = translate_node(node.args[0])
+            stop_value = translate_node(node.args[1])
+            return f"{start_value}..{stop_value}"
+        else:
+            return f"/* Rusthon: unsupported range arguments. */"
+
     func_name = translate_node(node.func)
     args = ', '.join([translate_node(arg) for arg in node.args])
     return f"{func_name}({args})"
@@ -94,3 +108,22 @@ def translate_print(node):
 def translate_return(node):
     return_expr = translate_node(node.value)
     return f"return {return_expr};"
+
+
+def translate_for(node):
+    if isinstance(node.iter, ast.Call) and isinstance(node.iter.func, ast.Name) and node.iter.func.id == "range":
+        target = translate_node(node.target)
+        if len(node.iter.args) == 1:
+            loop_range = translate_call(node.iter)
+            loop_body = "\n    ".join([translate_node(stmt)
+                                      for stmt in node.body])
+            return f"for {target} in {loop_range} {{\n    {loop_body}\n}}"
+        elif len(node.iter.args) == 2:
+            loop_range = translate_call(node.iter)
+            loop_body = "\n    ".join([translate_node(stmt)
+                                      for stmt in node.body])
+            return f"for {target} in {loop_range} {{\n    {loop_body}\n}}"
+        else:
+            return f"/* Rusthon: unsupported range arguments in for loop. */"
+    else:
+        return f"/* Rusthon: unsupported loop type. */"
