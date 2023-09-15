@@ -59,6 +59,12 @@ def translate_node(node):
         else:
             return str(node.value)
 
+    elif isinstance(node, ast.Try):
+        return translate_try_except(node)
+
+    elif isinstance(node, ast.Import):
+        return translate_import(node)
+
     return f"/* Rusthon: unable to translate the segment. ({type(node).__name__}) */"
 
 
@@ -181,3 +187,15 @@ def translate_type_from_value(node):
     elif isinstance(node, ast.NameConstant) and node.value is None:
         return "Option"
     return "unknown_type"
+
+
+def translate_import(node):
+    return f"// TODO: Handle import {', '.join([alias.name for alias in node.names])}"
+
+
+def translate_try_except(node):
+    try_body = "\n    ".join([translate_node(stmt) for stmt in node.body])
+    except_body = "\n    ".join([translate_node(stmt)
+                                for stmt in node.handlers[0].body])
+
+    return f"match (|| -> Result<_, &'static str> {{\n    {try_body}\n    Ok(())\n}})() {{\n    Ok(_) => {{ {try_body} }},\n    Err(e) => {{ {except_body} }}\n}}"
