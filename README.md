@@ -13,6 +13,8 @@ Currently, Rusthon supports the transpilation of the following constructs:
 - The conditional declaration if __name__ == "__main__":.
 - The print() function.
 - For loop and range()
+- Class definitions
+    - using types is better: `def __init__(self, name: str, age: int)`
 
 ## How to Use
 1. Clone the repository:
