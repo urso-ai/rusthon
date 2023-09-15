@@ -1,5 +1,7 @@
 import ast
 
+known_classes = set()
+
 
 def translate_node(node):
     if isinstance(node, ast.BinOp):
@@ -42,6 +44,21 @@ def translate_node(node):
     elif isinstance(node, ast.For):
         return translate_for(node)
 
+    elif isinstance(node, ast.Call):
+        return translate_call(node)
+
+    elif isinstance(node, ast.Attribute):
+        return f"{translate_node(node.value)}.{node.attr}"
+
+    elif isinstance(node, ast.ClassDef):
+        return translate_class(node)
+
+    elif isinstance(node, ast.Constant):
+        if isinstance(node.value, str):
+            return f'"{node.value}"'
+        else:
+            return str(node.value)
+
     return f"/* Rusthon: unable to translate the segment. ({type(node).__name__}) */"
 
 
@@ -79,6 +96,10 @@ def translate_call(node):
             return f"{start_value}..{stop_value}"
         else:
             return f"/* Rusthon: unsupported range arguments. */"
+
+    if isinstance(node.func, ast.Name) and node.func.id in known_classes:
+        args = ', '.join([translate_node(arg) for arg in node.args])
+        return f"{node.func.id}::new({args})"
 
     func_name = translate_node(node.func)
     args = ', '.join([translate_node(arg) for arg in node.args])
@@ -127,3 +148,36 @@ def translate_for(node):
             return f"/* Rusthon: unsupported range arguments in for loop. */"
     else:
         return f"/* Rusthon: unsupported loop type. */"
+
+
+def translate_class(node):
+    class_name = node.name
+    fields = []
+    known_classes.add(class_name)
+
+    for item in node.body:
+        if isinstance(item, ast.FunctionDef) and item.name == "__init__":
+            for arg in item.args.args:
+                if arg.arg != 'self':
+                    fields.append((arg.arg, translate_type(arg.annotation)))
+
+    fields_str = ",\n    ".join([f"{name}: {type_}" for name, type_ in fields])
+    struct_str = f"struct {class_name} {{\n    {fields_str}\n}}\n\n"
+
+    args_str = ", ".join([f"{name}: {type_}" for name, type_ in fields])
+    impl_str = f"impl {class_name} {{\n    fn new({args_str}) -> {class_name} {{\n        {class_name} {{ {', '.join([name for name, _ in fields])} }}\n    }}\n}}\n\n"
+
+    return struct_str + impl_str
+
+
+def translate_type_from_value(node):
+    if isinstance(node, ast.Str):
+        return "String"
+    elif isinstance(node, ast.Num):
+        if isinstance(node.n, int):
+            return "i32"
+        elif isinstance(node.n, float):
+            return "f32"
+    elif isinstance(node, ast.NameConstant) and node.value is None:
+        return "Option"
+    return "unknown_type"
