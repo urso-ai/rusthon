@@ -1,5 +1,7 @@
 import ast
 
+known_classes = set()
+
 
 def translate_node(node):
     if isinstance(node, ast.BinOp):
@@ -42,6 +44,15 @@ def translate_node(node):
     elif isinstance(node, ast.For):
         return translate_for(node)
 
+    elif isinstance(node, ast.Call):
+        return translate_call(node)
+
+    elif isinstance(node, ast.Attribute):
+        return f"{translate_node(node.value)}.{node.attr}"
+
+    elif isinstance(node, ast.ClassDef):
+        return translate_class(node)
+
     return f"/* Rusthon: unable to translate the segment. ({type(node).__name__}) */"
 
 
@@ -69,6 +80,7 @@ def translate_type(node):
 
 
 def translate_call(node):
+    # Tradução específica para o caso do 'range' em Python
     if isinstance(node.func, ast.Name) and node.func.id == "range":
         if len(node.args) == 1:
             stop_value = translate_node(node.args[0])
@@ -80,6 +92,12 @@ def translate_call(node):
         else:
             return f"/* Rusthon: unsupported range arguments. */"
 
+    # Tradução para chamadas de construtor de classes conhecidas
+    if isinstance(node.func, ast.Name) and node.func.id in known_classes:
+        args = ', '.join([translate_node(arg) for arg in node.args])
+        return f"{node.func.id}::new({args})"
+
+    # Tradução geral para outras chamadas de função
     func_name = translate_node(node.func)
     args = ', '.join([translate_node(arg) for arg in node.args])
     return f"{func_name}({args})"
@@ -127,3 +145,25 @@ def translate_for(node):
             return f"/* Rusthon: unsupported range arguments in for loop. */"
     else:
         return f"/* Rusthon: unsupported loop type. */"
+
+
+def translate_class(node):
+    class_name = node.name
+    fields = []
+    known_classes.add(class_name)
+    for item in node.body:
+        if isinstance(item, ast.FunctionDef) and item.name == "__init__":
+            for stmt in item.body:
+                if isinstance(stmt, ast.Assign):
+                    for target in stmt.targets:
+                        if isinstance(target, ast.Attribute):
+                            fields.append(
+                                (target.attr, translate_type(target.value)))
+
+    fields_str = ",\n    ".join([f"{name}: {type_}" for name, type_ in fields])
+    struct_str = f"struct {class_name} {{\n    {fields_str}\n}}\n\n"
+
+    args_str = ", ".join([f"{name}: {type_}" for name, type_ in fields])
+    impl_str = f"impl {class_name} {{\n    fn new({args_str}) -> {class_name} {{\n        {class_name} {{ {', '.join([name for name, _ in fields])} }}\n    }}\n}}\n\n"
+
+    return struct_str + impl_str
