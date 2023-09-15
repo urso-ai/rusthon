@@ -1,5 +1,6 @@
 from rusthon.translator import translate_node
 from rusthon.utils import analyze_python_code
+from rusthon.highlighter import colorize_rust_code
 
 
 def main():
@@ -13,9 +14,11 @@ def main():
     else:
         rust_code = "Error parsing the Python code."
 
+    rust_code_colored = colorize_rust_code(rust_code)
+
     print("Generated Rust code:")
     print("====================")
-    print(rust_code)
+    print(rust_code_colored)
 
 
 if __name__ == "__main__":
